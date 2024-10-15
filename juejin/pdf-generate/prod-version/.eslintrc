@@ -1,0 +1,7 @@
+{
+  "extends": "eslint-config-egg",
+  "root": true,
+  "rules": {
+    "jsdoc/check-tag-names": 0
+  }
+}
