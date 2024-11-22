@@ -8,14 +8,13 @@ const Service = require('egg').Service;
 const stringHelper = require('../extend/string');
 const fileHelper = require('../extend/fileHelper');
 const dateHelper = require('../extend/date');
-const puppeteer = require('puppeteer');
 class ApiService extends Service {
 
   // 生成名称
   generateFileNameAndPath(tempPath, fullUrl) {
     const ext = '.pdf';
     // 根据当前请求生成文件名
-    let uniqueName = stringHelper.md5(fullUrl);
+    const uniqueName = stringHelper.md5(fullUrl);
     const timePath = dateHelper.formatDateTime(dateHelper.getCurrentTimeInt(false), dateHelper.FORMAT_TYPE.TYPE_YMD);
 
     // 当前路径
@@ -26,6 +25,11 @@ class ApiService extends Service {
     return { uniqueName: filenameWithExt, filePath };
   }
 
+  // 判断文件是否已经存在
+  checkPdfFile(filePath) {
+    return fileHelper.fileExistsSync(filePath);
+  }
+
 
   // 生成pdf
   async createPdf(pdfParams = {}) {
@@ -34,41 +38,36 @@ class ApiService extends Service {
     const footerTip = config?.footerTip || '课堂报告';
     const margin = config.margin || 20;
 
-    const browser = await puppeteer.launch({
-      args: [
-        '--ignore-certificate-errors', // 忽略证书错误
-        '--no-sandbox',
-      ],
-    });
-    const page = await browser.newPage();
-    // await page.setBypassCSP(false);
-    if (authKey && authValue) {
-      await page.setExtraHTTPHeaders({
-        [`${authKey}`]: authValue,
+    // 从链接池中取出实例
+    await this.app.pool.use(async instance => {
+      const page = await instance.newPage();
+      // await page.setBypassCSP(false);
+      if (authKey && authValue) {
+        await page.setExtraHTTPHeaders({
+          [`${authKey}`]: authValue,
+        });
+      }
+
+      // 打开url
+      await page.mainFrame().goto(fullUrl);
+
+      // 等待渲染成功的标识元素出现
+      await page.waitForSelector(completeTag);
+
+      // 导出pdf
+      await page.pdf({
+        path: filePath,
+        displayHeaderFooter: false,
+        footerTemplate: `<p>${footerTip}</p>`,
+        format: 'A4',
+        preferCSSPageSize: false,
+        printBackground: true,
+        margin: {
+          top: `${margin}`,
+          bottom: `${margin}`,
+        },
       });
-    }
-
-    // 打开url
-    await page.mainFrame().goto(fullUrl);
-
-    // 等待渲染成功的标识元素出现
-    await page.waitForSelector(completeTag);
-
-    // 导出pdf
-    await page.pdf({
-      path: filePath,
-      displayHeaderFooter: false,
-      footerTemplate: `<p>${footerTip}</p>`,
-      format: 'A4',
-      preferCSSPageSize: false,
-      printBackground: true,
-      margin: {
-        top: `${margin}`,
-        bottom: `${margin}`,
-      },
     });
-    // page.close()
-    await browser.close();
   }
 
 }

@@ -36,15 +36,20 @@ class ApiController extends Controller {
     // 根据当前请求生成文件名
     const { filePath, uniqueName } = ctx.service.api.generateFileNameAndPath(this.app.config.tempPathName, fullUrl);
 
+    // 是否已经生成过
+    const flag = ctx.service.api.checkPdfFile(filePath);
+
     // 生成pdf
-    await ctx.service.api.createPdf({
-      fullUrl,
-      filePath,
-      authKey,
-      authValue,
-      completeTag,
-      config,
-    });
+    if (!flag) {
+      await ctx.service.api.createPdf({
+        fullUrl,
+        filePath,
+        authKey,
+        authValue,
+        completeTag,
+        config,
+      });
+    }
 
     // 读取文件流
     const file = fileHelper.readStream(filePath);

@@ -74,9 +74,19 @@ function deleteDirectory(filePath, isSelf = true) {
   return true;
 }
 
+/**
+ * 判断文件是否存在
+ * @param {string}  filePath 文件路径
+ * return buffer
+ */
+function fileExistsSync(filePath) {
+  return fs.existsSync(filePath);
+}
+
 module.exports = {
   createDirectory,
   join,
   readStream,
   deleteDirectory,
+  fileExistsSync,
 };
