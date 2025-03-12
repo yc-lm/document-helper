@@ -1,0 +1,16 @@
+"app-plus": {
+              "subNVues": [
+                {
+                  "id": "controls", // 唯一标识
+                  "path": "subnvue/controls", // 页面路径
+                  /*"type": "popup",  这里不需要*/
+                  "style": {
+                    "position": "absolute",
+                    "left": "0px",
+                    "top": "0px",
+                    "height": "211.5px",
+                    "background": "transparent"
+                  }
+                }
+              ]
+            }

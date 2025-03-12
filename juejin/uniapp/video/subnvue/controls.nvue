@@ -1,0 +1,305 @@
+<!--
+ * @name: VideoCoverH5.vue
+ * @author: yangcongcong
+ * @date: 2025/3/3
+ * @description: 描述
+-->
+
+<template>
+    <view class="controls" :style="styleObj" @tap.stop.prevent="handleCustomTap">
+        <image class="controls-edit" src="/static/images/report/edit.png" @click="handleEdit"></image>
+        <view class="controls-hidden">
+            <image
+                    class="img"
+                    src="/static/images/report/original-hidden.png"
+                    @click="handleHidden"
+            ></image>
+            <text class="text" @click="handleHidden">隐藏视频</text>
+        </view>
+
+        <view class="controls-progress" :style="progressStyle">
+            <image
+                    v-if="currentStatus === CUSTOM_PLAY_STATUS_OBJ.START"
+                    class="controls-progress__play"
+                    src="/static/images/video/original-pause.png"
+                    @tap.stop.prevent="handleVideoPlay"
+            ></image>
+
+            <image
+                    v-else
+                    class="controls-progress__play"
+                    src="/static/images/video/original-play.png"
+                    @tap.stop.prevent="handleVideoPlay"
+            ></image>
+
+            <text class="controls-progress__time common-center">{{
+                    formatDurationTime({time: currentTime * 1000})
+                }}
+            </text>
+
+            <view class="controls-progress__slider">
+                <uv-slider
+                        v-model="currentTime"
+                        :max="duration"
+                        :step="1"
+                        @change="handleChangeEnd"
+                        @changing="onChanging"
+                ></uv-slider>
+            </view>
+
+            <text class="controls-progress__duration common-center">{{
+                    formatDurationTime({time: duration * 1000})
+                }}
+            </text>
+
+            <image
+                    class="controls-progress__landscape"
+                    src="/static/images/video/original-landscape.png"
+                    @click="handleFullScreen"
+            ></image>
+        </view>
+    </view>
+</template>
+
+<script setup>
+    import {computed, ref, watch, onBeforeUnmount, onMounted} from "vue";
+    import {formatDurationTime} from 'etah-sdk/lib/date';
+    import usePlayer, {CUSTOM_PLAY_STATUS_OBJ, PlayerSubNVueEvent} from '@/hooks/usePlayer';
+
+    const PAGE_VARS = {
+        LOG_PREFIX: 'SubControls',
+    };
+    const {isStart, isPaused, isEnd} = usePlayer();
+    // 总时长
+    const duration = ref(0);
+    // 屏幕宽度
+    const windowWidth = ref(0);
+    // 视频高度
+    const videoHeight = ref(211.5);
+    const syncTime = ref(0);
+    const syncStatus = ref(0);
+
+
+    // 当前播放状态
+    const currentStatus = ref(CUSTOM_PLAY_STATUS_OBJ.INIT);
+    // 当前播放时间
+    const currentTime = ref(0);
+    // 是否手动改变时间
+    const isHandChange = ref(false);
+
+    // 外层盒子样式
+    const styleObj = computed(() => {
+        return {
+            height: '211.5px',
+        }
+    });
+
+    // 进度条样式
+    const progressStyle = computed(() => {
+        return {
+            width: windowWidth.value + 'px',
+        }
+    })
+
+    const handleEdit = () => {
+        triggerEvent('handleEdit');
+    };
+    const handleHidden = () => {
+        triggerEvent('handleHidden');
+    };
+
+    const handleFullScreen = () => {
+        triggerEvent('handleFullScreen');
+    };
+
+    const handleCustomTap = ()=>{
+        triggerEvent('handleCustomTap');
+    }
+
+    // 鼠标按下
+    const onChanging = () => {
+        console.log('onChanging');
+        isHandChange.value = true;
+        triggerEvent('onChanging');
+    };
+
+    // 松开拖动mouseup 或点击滑块条时触发，适合不希望在拖动滑块过程频繁触发回调的场景实用
+    const handleChangeEnd = (val) => {
+        console.log('handleChangeEnd');
+        isHandChange.value = false;
+        triggerEvent('changeTime', val);
+    };
+
+    // 播放状态
+    const handleVideoPlay = () => {
+        // 播放中
+        if (isStart(currentStatus.value)) {
+            // 请求暂停
+            triggerEvent('handlePausedReq');
+            currentStatus.value = CUSTOM_PLAY_STATUS_OBJ.PAUSED;
+            return true;
+        }
+
+        // 暂停状态
+        if (isPaused(currentStatus.value)) {
+            // 请求继续播放
+            triggerEvent('handleResumeReq');
+            currentStatus.value = CUSTOM_PLAY_STATUS_OBJ.START;
+            return true;
+        }
+
+        // 播放完成状态
+        if (isEnd(currentStatus.value)) {
+            // 请求重头开始播放
+            //emits('handleRestartReq');
+            triggerEvent('handleRestartReq');
+            // 播放成功会回调改状态
+            return true;
+        }
+
+        return false;
+    };
+
+    const onInformationHandler = (params) => {
+        if (params.duration) {
+            duration.value = params.duration;
+        }
+
+        syncTime.value = params.time;
+        syncStatus.value = params.status;
+    };
+
+    const triggerEvent = (event, params = null) => {
+        console.log(`${PAGE_VARS.LOG_PREFIX}: triggerEvent, event(${event}, params{${params})`);
+        uni.$emit(PlayerSubNVueEvent.SubControlsAction, {event, params});
+    }
+
+    watch(
+        () => syncStatus.value,
+        (val) => {
+            currentStatus.value = val;
+        },
+    );
+
+    watch(
+        () => syncTime.value,
+        (val) => {
+            if (!isHandChange.value) {
+                currentTime.value = val;
+            }
+        },
+    );
+
+    onMounted(() => {
+        // 初始化宽度（nvue无法设置100%）
+        const systemInfo = uni.getSystemInfoSync();
+        console.log(`${PAGE_VARS.LOG_PREFIX}: onMounted`, JSON.stringify(systemInfo), systemInfo.windowWidth);
+        windowWidth.value = systemInfo.windowWidth;
+        // 监听事件
+        uni.$on(PlayerSubNVueEvent.VideoInformation, onInformationHandler);
+    });
+
+    onBeforeUnmount(() => {
+        uni.$off(PlayerSubNVueEvent.VideoInformation, onInformationHandler);
+    });
+</script>
+
+<style scoped lang="scss">
+  $imgSize: 24px;
+  $top: 13px;
+  $left: 16px;
+
+  .controls {
+    position: relative;
+
+    &-edit {
+      width: #{$imgSize};
+      height: #{$imgSize};
+      position: absolute;
+      right: #{$left};
+      top: #{$top};
+    }
+
+    &-hidden {
+      position: absolute;
+      right: 8px;
+      top: 105.75px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .img {
+        width: #{$imgSize};
+        height: #{$imgSize};
+      }
+
+      .text {
+        height: 14px;
+        font-weight: 600;
+        font-size: 10px;
+        color: #ffffff;
+        line-height: 14px;
+      }
+    }
+
+    &-progress {
+      width: 500px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 48px;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.6) 100%);
+      padding: 0 16px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+
+      &__play {
+        width: #{$imgSize};
+        height: #{$imgSize};
+        margin-right: 16px;
+      }
+
+      &__time,
+      &__duration {
+        font-size: 12px;
+        color: #fff;
+        font-weight: 600;
+        // min-width: 33px;
+      }
+
+      &__slider {
+        flex: 1;
+        margin: 0 8px;
+        // 次组件相关的重写都用px，与它内容样式使用统一单位
+        :deep(.uv-slider) {
+          .uni-slider-wrapper {
+            .uni-slider-handle-wrapper {
+              height: 3px;
+
+              .uni-slider-thumb {
+                width: 6px !important;
+                height: 6px !important;
+                margin-left: -4px !important;
+                margin-top: -3px !important;
+                border: 1px solid #017fff;
+              }
+
+              .uni-slider-track {
+                height: 3px;
+              }
+            }
+          }
+        }
+      }
+
+      &__landscape {
+        width: #{$imgSize};
+        height: #{$imgSize};
+        margin-left: 16px;
+      }
+    }
+  }
+</style>
