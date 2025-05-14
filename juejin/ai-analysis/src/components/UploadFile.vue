@@ -15,6 +15,7 @@
       :before-upload="beforeUpload"
       :request-method="requestMethod"
       action=""
+      draggable
       @fail="handleError"
       @success="handleSuccess"
     />
@@ -28,13 +29,14 @@ import { KeyValue } from '../global';
 
 defineOptions({ name: 'UploadFile' });
 
+const emits = defineEmits(['videoInfo', 'audioInfo', 'transcodeProgress']);
 const fileList = ref([]);
 const uploadRef: KeyValue = ref(null);
 const transcodeInstance: KeyValue = ref(null);
 
 // 手动上传
 const requestMethod = async (file) => {
-  console.log(`requestMethod===>`, file);
+  emits('videoInfo', file);
   await transcodeInstance.value.transcodeMp3(file.raw, 'm4a');
   return {
     status: 'success',
@@ -75,12 +77,11 @@ const registerTranscodeEvent = () => {
     console.log(`registerTranscodeEvent===> TRANSCODE_END_DATA`, blobData);
 
     const url = URL.createObjectURL(blobData);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'output.mp3';
-    a.click();
+    emits('audioInfo', url);
+  });
 
-    URL.revokeObjectURL(url);
+  transcodeInstance.value.on(TranscodeEventCollection.PROGRESS, (val) => {
+    emits('transcodeProgress', val);
   });
 };
 

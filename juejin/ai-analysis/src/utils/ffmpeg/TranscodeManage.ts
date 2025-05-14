@@ -30,6 +30,9 @@ class TranscodeManage extends EventEmitter {
       this.ffmpeg.on('log', ({ message: msg }: LogEvent) => {
         console.log('msg', msg);
       });
+      this.ffmpeg.on('progress', ({ progress }: LogEvent) => {
+        this.emit(TranscodeEventCollection.PROGRESS, progress);
+      });
       // toBlobURL is used to bypass CORS issue, urls with the same
       // domain can be used directly.
       await this.ffmpeg.load({

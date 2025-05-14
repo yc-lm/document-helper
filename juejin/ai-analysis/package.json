@@ -14,9 +14,11 @@
     "tdesign-vue-next": "latest",
     "vite-svg-loader": "^5.1.0",
     "vue": "^3.4.21",
+    "lodash": "^4.17.21",
     "eventemitter3": "^5.0.1",
     "@ffmpeg/ffmpeg": "^0.12.10",
-    "@ffmpeg/util": "^0.12.1"
+    "@ffmpeg/util": "^0.12.1",
+    "reconnecting-websocket": "^4.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",

@@ -12,6 +12,9 @@ export const TranscodeEventCollection = {
   // 转码结束触发的数据
   TRANSCODE_END_DATA: 'END_DATA',
 
+  // 转码进度
+  PROGRESS: 'PROGRESS',
+
   //  发生错误
   ERROR: 'ERROR',
 };
