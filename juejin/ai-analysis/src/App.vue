@@ -25,9 +25,9 @@
         <video :src="videoSrc" controls autoplay />
 
         <t-space direction="vertical" class="wrapper-body-video__buttons">
-          <t-button block theme="primary" variant="base" @click="handleAudioAnalysis" :disabled="!audioBlobData"
-            >开始语音识别</t-button
-          >
+          <t-button block theme="primary" variant="base" @click="handleAudioAnalysis">开始语音识别</t-button>
+
+          <t-button block theme="primary" variant="base" @click="handleAiAnalysis">开始ai分析</t-button>
         </t-space>
       </div>
       <div class="wrapper-body-detail">
@@ -38,21 +38,23 @@
           </t-tab-panel>
           <t-tab-panel value="second">
             <template #label> <FlagIcon class="tabs-icon-margin" /> 全文总结 </template>
-            <p style="padding: 25px">
-              {{ `${theme}选项卡2内容` }}
-            </p>
+            <p style="padding: 25px" v-html="aiAnalysisResult.summary"></p>
           </t-tab-panel>
           <t-tab-panel value="third">
             <template #label> <ListIcon class="tabs-icon-margin" /> 段落 </template>
-            <p style="padding: 25px">
-              {{ `${theme}选项卡3内容` }}
-            </p>
+            <t-collapse :default-value="[0]">
+              <t-collapse-panel
+                :header="`${formatVideoTime(item.start / 1000)}-${formatVideoTime(item.end / 1000)}`"
+                v-for="(item, index) in aiAnalysisResult.paragraph"
+                :key="index"
+              >
+                {{ item.text }}
+              </t-collapse-panel>
+            </t-collapse>
           </t-tab-panel>
           <t-tab-panel value="four">
             <template #label> <TreeRoundDotVerticalIcon class="tabs-icon-margin" /> 思维导图 </template>
-            <p style="padding: 25px">
-              {{ `${theme}选项卡4内容` }}
-            </p>
+            <mind-map></mind-map>
           </t-tab-panel>
         </t-tabs>
       </div>
@@ -61,16 +63,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, reactive } from 'vue';
 import UploadFile from './components/UploadFile.vue';
 import { AudioIcon, FlagIcon, ListIcon, TreeRoundDotVerticalIcon } from 'tdesign-icons-vue-next';
 import wsHandler from './utils/wsHandler';
 import { KeyValue } from './global';
-import AudioList from "./components/AudioList.vue";
+import AudioList from './components/AudioList.vue';
+import axios from 'axios';
+import mockData from './utils/mockdata/index.js';
+import { handleParagraphData } from './utils/dataHandler';
+import { formatVideoTime } from './utils/time';
+import MindMap from './components/MindMap.vue';
 
 const PAGE_VARS = {
-  // funASR服务连接地址
-  funASRUrl: 'ws://127.0.0.1:10095/',
+  // FunASR服务连接地址
+  FunASRUrl: 'ws://127.0.0.1:10095/',
+  // ai分析服务地址
+  AiAnalysisUrl: 'http://127.0.0.1:3000',
+  // 是否开启mock数据
+  mock: true,
 };
 
 const percentage = ref(0); // 视频提取音频进度
@@ -80,6 +91,11 @@ const videoSrc = ref(''); // 视频地址
 const wsClient: KeyValue | null = ref(null); // ws连接
 const totalSend = ref(0); // 音频采样数据
 const audioTextData = ref<KeyValue[]>([]); // 语音识别结果
+const aiAnalysisResult = reactive({
+  summary: '', // 全文总结
+  paragraph: [], // 段落
+  mindMap: '', // 思维导图
+});
 
 const tabActive = ref('first');
 const theme = ref('normal');
@@ -101,11 +117,48 @@ const handleTranscodeProgress = (val: number) => {
   percentage.value = parseInt((val * 100).toFixed(2), 10);
 };
 
+// 获取语音识别上下文
+const getAudioContext = () => {
+  const list = audioTextData.value.map((item) => {
+    return `开始时间：${item.start} 结束时间：${item.end} 内容：${item?.text_seg?.replace(/\s/g, '')}`;
+  });
+  return list.join(',');
+};
+
+// 生成全文总结的引导词
+const getAiAnalysisSummary = () => {
+  return `-以下是一段音频中的语音内容，每句话包含开始时间，结束时间以及内容，请你根据文本内容生成全文总结，返回格式要求为纯文本。语音内容为：${getAudioContext()}`;
+};
+
+// 生成段落的引导词
+const getAiAnalysisParagraph = () => {
+  return `-以下是一段音频中的语音内容，每句话包含开始时间，结束时间以及内容，请你根据全文内容进行分章节， 不能超过5个章节，要求返回格式如下：{"a":{start: 0, end: 10, text: '这是第一个段落'}, "b":{start: 10, end: 20, text: '这是第二个段落'}}。-语音内容为：${getAudioContext()}`;
+};
+
+// 开始ai分析
+const handleAiAnalysis = async () => {
+  if (PAGE_VARS.mock) {
+    aiAnalysisResult.summary = mockData.summary;
+    aiAnalysisResult.paragraph = handleParagraphData(mockData.paragraph);
+    return;
+  }
+  const resultSummary = await axios.post(`${PAGE_VARS.AiAnalysisUrl}/chat`, { question: getAiAnalysisSummary() });
+  const resultParagraph = await axios.post(`${PAGE_VARS.AiAnalysisUrl}/chat`, { question: getAiAnalysisParagraph() });
+
+  aiAnalysisResult.summary = resultSummary.data?.answer;
+  aiAnalysisResult.paragraph = handleParagraphData(resultParagraph.data?.answer);
+};
+
+// 开始语音识别
 const handleAudioAnalysis = async () => {
+  if (PAGE_VARS.mock) {
+    audioTextData.value = mockData.audio;
+    return;
+  }
   await initWs();
 };
 
-// 开始转码消息
+// 开始消息
 const startTranscriptionMessage = () => {
   return {
     chunk_size: new Array(5, 10, 5),
@@ -117,7 +170,7 @@ const startTranscriptionMessage = () => {
     mode: 'offline',
   };
 };
-
+// 停止消息
 const stopTranscriptionMessage = () => {
   const request = {
     chunk_size: new Array(5, 10, 5),
@@ -156,7 +209,7 @@ const sendAudioData = async () => {
 // 连接ws
 const initWs = async () => {
   wsClient.value = wsHandler.connect(
-    PAGE_VARS.funASRUrl,
+    PAGE_VARS.FunASRUrl,
     {
       connectionTimeout: 3000,
       maxRetries: 0,
@@ -217,6 +270,7 @@ const initWs = async () => {
 
     &-video {
       width: 336px;
+      flex-shrink: 0;
       video {
         width: 100%;
       }
