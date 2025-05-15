@@ -76,8 +76,7 @@ const registerTranscodeEvent = () => {
   transcodeInstance.value.on(TranscodeEventCollection.TRANSCODE_END_DATA, (blobData) => {
     console.log(`registerTranscodeEvent===> TRANSCODE_END_DATA`, blobData);
 
-    const url = URL.createObjectURL(blobData);
-    emits('audioInfo', url);
+    emits('audioInfo', blobData);
   });
 
   transcodeInstance.value.on(TranscodeEventCollection.PROGRESS, (val) => {

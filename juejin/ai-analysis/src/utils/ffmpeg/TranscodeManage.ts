@@ -42,7 +42,6 @@ class TranscodeManage extends EventEmitter {
       this.isLoaded = true;
       this.emit(TranscodeEventCollection.LOAD_CORE_SUCCESS);
     } catch (err) {
-      console.log(err);
       this.emit(TranscodeEventCollection.ERROR, TranscodeErrorType.LOAD_CORE_ERROR);
     }
   };
@@ -86,7 +85,6 @@ class TranscodeManage extends EventEmitter {
 
       this.emit(TranscodeEventCollection.TRANSCODE_END_DATA, blobData);
     } catch (err) {
-      console.log(err);
       this.emit(TranscodeEventCollection.ERROR, TranscodeErrorType.TRANSCODE_ERROR);
     }
   };
